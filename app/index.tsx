@@ -1,11 +1,43 @@
 import { Text, View, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from "react-native";
 import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Index() {
   const [now, setNow] = useState(new Date());
   const [popupVisible, setPopupVisible] = useState(false);
+  const [text, setText] = useState("");
+  const [savedText, setSavedText] = useState("");
+  const [tasks, setTasks] = useState<string[]>([]);
 
+
+  const handlePress = async () => {
+    if (text.trim() === "") return;
+    const newTasks = [...tasks, text];
+    setTasks(newTasks);
+    setText("");
+    setPopupVisible(false);
+    await AsyncStorage.setItem("tasks", JSON.stringify(newTasks));
+  };
+  const deleteTask = async (indexToDelete: number) => {
+    const updatedTasks = tasks.filter((_, index) => index !== indexToDelete);
+    setTasks(updatedTasks);
+    await AsyncStorage.setItem("tasks", JSON.stringify(updatedTasks));
+  };
   useEffect(() => {
+    const loadStoredTasks = async () => {
+      try {
+        const storedTasks = await AsyncStorage.getItem("tasks");
+        if (storedTasks) {
+          setTasks(JSON.parse(storedTasks));
+        }
+      } catch (error) {
+        console.error("Failed to load tasks", error);
+      }
+    };
+
+    loadStoredTasks();
+
     const timer = setInterval(() => setNow(new Date()), 500);
     return () => clearInterval(timer);
   }, []);
@@ -31,12 +63,14 @@ export default function Index() {
       </View>
       <View style={Style.bottomWrapper}>
         <ScrollView style={Style.bottomcontainer} contentContainerStyle={Style.scrollContent}>
-          <View style={Style.tasks}></View>
-          <View style={Style.tasks}></View>
-          <View style={Style.tasks}></View>
-          <View style={Style.tasks}></View>
-          <View style={Style.tasks}></View>
-          <View style={Style.tasks}></View>
+          {tasks.map((task, index) => (
+            <View key={index} style={Style.tasks}>
+              <Text style={Style.taskText}>{task}</Text>
+              <TouchableOpacity onPress={() => deleteTask(index)}>
+                <Ionicons name="trash-outline" size={24} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
         </ScrollView>
         <TouchableOpacity style={Style.addbutton} onPress={() => setPopupVisible(true)}>
           <Text style={Style.addButtonText}>+</Text>
@@ -44,18 +78,26 @@ export default function Index() {
       </View>
 
       <Modal transparent animationType="fade" visible={popupVisible} statusBarTranslucent>
-        <TouchableOpacity style={Style.backdrop} activeOpacity={1} onPress={() => setPopupVisible(false)}>
+        <TouchableOpacity style={Style.backdrop} activeOpacity={1} onPress={() => {
+          setPopupVisible(false);
+          setText("");
+        }}>
           <TouchableOpacity style={Style.popup} activeOpacity={1} onPress={() => { }}>
             <TextInput
               style={Style.input}
               placeholder="New Objective"
               placeholderTextColor="#888"
+              value={text}
+              onChangeText={setText}
             />
             <View style={Style.popupButtons}>
-              <TouchableOpacity style={Style.cancelBtn} onPress={() => setPopupVisible(false)}>
+              <TouchableOpacity style={Style.cancelBtn} onPress={() => {
+                setPopupVisible(false);
+                setText("");
+              }}>
                 <Text style={Style.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={Style.createBtn}>
+              <TouchableOpacity style={Style.createBtn} onPress={handlePress}>
                 <Text style={Style.createText}>Create</Text>
               </TouchableOpacity>
             </View>
@@ -146,6 +188,18 @@ const Style = StyleSheet.create({
     width: "90%",
     backgroundColor: "#1C1C1C",
     borderRadius: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  taskText: {
+    color: "#d4d0c8",
+    fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
+    marginRight: 10,
   },
 
   addbutton: {
